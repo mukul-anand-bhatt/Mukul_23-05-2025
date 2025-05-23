@@ -4,6 +4,21 @@ CSV - [Link](https://drive.google.com/file/d/1cLDoBxx5juEii8OHeb8k410UAzTEo9L4/v
 
 ![WhatsApp Image 2025-05-23 at 13 43 22_1402b8d7](https://github.com/user-attachments/assets/25c242d2-ee37-4845-9887-87ff952b5f12)
 
+FUTURE SCOPE - Advantages of your Redis approach:
+For heartbeat monitoring:
+
+Redis TTL (Time To Live) keys are perfect for heartbeat patterns - you can set a key with expiration that gets refreshed by your thread
+Much more efficient than polling a database for status
+Redis pub/sub can notify other components when heartbeats stop
+Built-in atomic operations prevent race conditions
+
+For dynamic data ingestion:
+
+Redis Streams or pub/sub channels excel at real-time data flow coordination
+You can use Redis as a message broker between data sources and your database
+Redis Lists can act as queues for batch processing
+Built-in data structures (sets, sorted sets) help with deduplication and ordering
+
 
 
 Restaurant Monitoring System
