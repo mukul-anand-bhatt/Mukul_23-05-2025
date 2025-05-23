@@ -55,7 +55,7 @@ If running: {"status": "Running"}
 If complete: Downloads CSV file
 If failed/not found: Error message
 
-4. Store Data Summary
+3. Store Data Summary
 httpGET /store_summary?store_id={store_id}
 Response:
 json{
