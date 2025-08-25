@@ -63,6 +63,73 @@ def load_data():
         else:
             print(f"Database already contains data: {existing_status_count} status records, {existing_hours_count} business hours, {existing_tz_count} timezones")
 
+def ingest_new_data():
+    """Incrementally ingest new rows from CSVs. Idempotent via merge on natural keys."""
+    from models import StoreStatus, BusinessHours, StoreTimezones
+
+    with SessionLocal() as session:
+        # latest timestamp seen in DB for status
+        latest = session.query(StoreStatus.timestamp_utc).order_by(StoreStatus.timestamp_utc.desc()).first()
+        latest_ts = latest[0] if latest else None
+
+        # read CSVs
+        df_status = pd.read_csv("data/store_status.csv")
+        df_status['timestamp_utc'] = pd.to_datetime(df_status['timestamp_utc'].str.replace(' UTC', ''))
+
+        # filter to only newer
+        if latest_ts is not None:
+            df_status = df_status[df_status['timestamp_utc'] > latest_ts]
+
+        inserted = 0
+        for _, row in df_status.iterrows():
+            # merge ensures idempotency based on store_id+timestamp_utc
+            existing = session.query(StoreStatus).filter(
+                StoreStatus.store_id == row.store_id,
+                StoreStatus.timestamp_utc == row.timestamp_utc
+            ).first()
+            if existing:
+                existing.status = row.status
+            else:
+                session.add(StoreStatus(
+                    store_id=row.store_id,
+                    timestamp_utc=row.timestamp_utc,
+                    status=row.status
+                ))
+                inserted += 1
+
+        # business hours and timezones assumed slowly changing; upsert all present rows
+        df_hours = pd.read_csv("data/menu_hours.csv")
+        for _, row in df_hours.iterrows():
+            existing = session.query(BusinessHours).filter(
+                BusinessHours.store_id == row.store_id,
+                BusinessHours.dayOfWeek == row.dayOfWeek,
+                BusinessHours.start_time_local == row.start_time_local,
+                BusinessHours.end_time_local == row.end_time_local,
+            ).first()
+            if not existing:
+                session.add(BusinessHours(
+                    store_id=row.store_id,
+                    dayOfWeek=row.dayOfWeek,
+                    start_time_local=row.start_time_local,
+                    end_time_local=row.end_time_local
+                ))
+
+        df_tz = pd.read_csv("data/timezones.csv")
+        for _, row in df_tz.iterrows():
+            existing = session.query(StoreTimezones).filter(
+                StoreTimezones.store_id == row.store_id
+            ).first()
+            if existing:
+                existing.timezone_str = row.timezone_str
+            else:
+                session.add(StoreTimezones(
+                    store_id=row.store_id,
+                    timezone_str=row.timezone_str
+                ))
+
+        session.commit()
+        print(f"Ingestion complete. Inserted/updated {inserted} status rows.")
+
 # Main execution block
 if __name__ == "__main__":
     print("Initializing database...")

@@ -3,11 +3,13 @@ from fastapi.responses import FileResponse
 import uuid
 import os
 from report import generate_report, generate_single_store_report
-from db import init_db, load_data
+from db import init_db, load_data, ingest_new_data
 import threading
 import time
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = FastAPI(title="Store Monitoring System", description="API for monitoring restaurant uptime/downtime")
+scheduler = BackgroundScheduler()
 
 # Global dictionary to store report status
 report_status = {}
@@ -20,10 +22,24 @@ async def startup_event():
     print("Loading data...")
     load_data()
     print("Application startup complete!")
+    # Start periodic ingestion every 10 minutes to simulate hourly polling
+    try:
+        scheduler.add_job(ingest_new_data, 'interval', minutes=10, id='ingest_job', replace_existing=True)
+        scheduler.start()
+        print("BackgroundScheduler started: ingest_new_data every 10 minutes")
+    except Exception as e:
+        print(f"Failed to start scheduler: {e}")
 
 @app.get("/")
 async def root():
     return {"message": "Store Monitoring System API", "status": "running"}
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    try:
+        scheduler.shutdown(wait=False)
+    except Exception:
+        pass
 
 @app.post("/trigger_report")
 async def trigger_report():
@@ -138,6 +154,15 @@ async def trigger_single_store_report(store_id: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger single store report: {str(e)}")
+
+@app.post("/ingest")
+async def ingest_endpoint():
+    """Manually trigger ingestion of new data."""
+    try:
+        ingest_new_data()
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
 
 @app.get("/store_summary/{store_id}")
 async def get_store_summary(store_id: str):
