@@ -1,91 +1,3 @@
-# # File: report.py
-
-# import pandas as pd
-# import os
-# import pytz
-# from datetime import datetime, timedelta
-# from sqlalchemy.orm import Session
-# from db import SessionLocal
-# from models import StoreStatus, BusinessHours, StoreTimezones
-# from utils import get_local_time_range, interpolate_status
-# import json
-
-# STATUS_FILE = 'output/status.json'
-
-# def load_status():
-#     if os.path.exists(STATUS_FILE):
-#         with open(STATUS_FILE, 'r') as f:
-#             return json.load(f)
-#     return {}
-
-# def save_status(status_dict):
-#     os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
-#     with open(STATUS_FILE, 'w') as f:
-#         json.dump(status_dict, f)
-
-# reports_status = load_status()
-
-# def update_status(report_id, status):
-#     reports_status[report_id] = status
-#     save_status(reports_status)
-
-# def generate_report(report_id: str):
-#     try:
-#         db: Session = SessionLocal()
-#         stores = db.query(StoreStatus.store_id).distinct().all()
-#         stores = [s[0] for s in stores]
-
-#         max_timestamp = db.query(StoreStatus.timestamp_utc).order_by(StoreStatus.timestamp_utc.desc()).first()[0]
-#         now = max_timestamp.astimezone(pytz.utc)
-#         intervals = {
-#             'hour': now - timedelta(hours=1),
-#             'day': now - timedelta(days=1),
-#             'week': now - timedelta(days=7),
-#         }
-
-#         rows = []
-
-#         for store_id in stores:
-#             timezone = db.query(StoreTimezones).filter_by(store_id=store_id).first()
-#             timezone_str = timezone.timezone_str if timezone else 'America/Chicago'
-
-#             metrics = {
-#                 'store_id': store_id
-#             }
-#             for label, start_time in intervals.items():
-#                 start_time = start_time.astimezone(pytz.utc)
-
-#                 status_data = db.query(StoreStatus).filter(
-#                     StoreStatus.store_id == store_id,
-#                     StoreStatus.timestamp_utc >= start_time,
-#                     StoreStatus.timestamp_utc <= now
-#                 ).order_by(StoreStatus.timestamp_utc).all()
-
-#                 biz_hours = db.query(BusinessHours).filter_by(store_id=store_id).all()
-
-#                 if not biz_hours:
-#                     business_periods = get_local_time_range(start_time, now, timezone_str, full_day=True)
-#                 else:
-#                     business_periods = get_local_time_range(start_time, now, timezone_str, hours=biz_hours)
-
-#                 up, down = interpolate_status(status_data, business_periods)
-#                 metrics[f'uptime_last_{label}'] = round(up.total_seconds() / 3600 if label != 'hour' else up.total_seconds() / 60, 2)
-#                 metrics[f'downtime_last_{label}'] = round(down.total_seconds() / 3600 if label != 'hour' else down.total_seconds() / 60, 2)
-
-#             rows.append(metrics)
-
-#         df = pd.DataFrame(rows)
-#         os.makedirs('output', exist_ok=True)
-#         df.to_csv(f'output/{report_id}.csv', index=False)
-#         update_status(report_id, "Complete")
-
-#     except Exception as e:
-#         print(f"[ERROR] Report generation failed for {report_id}: {e}")
-#         update_status(report_id, f"Failed: {e}")
-
-
-
-
 import pandas as pd
 import os
 import pytz
@@ -98,22 +10,16 @@ import json
 
 STATUS_FILE = 'output/status.json'
 
-def load_status():
-    if os.path.exists(STATUS_FILE):
-        with open(STATUS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
+# Remove the local status tracking - main.py will handle this
+# reports_status = {}
 
-def save_status(status_dict):
-    os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
-    with open(STATUS_FILE, 'w') as f:
-        json.dump(status_dict, f)
+# def update_status(report_id, status):
+#     """Update report status - this will be called from main.py"""
+#     reports_status[report_id] = status
 
-reports_status = load_status()
-
-def update_status(report_id, status):
-    reports_status[report_id] = status
-    save_status(reports_status)
+# def get_report_status(report_id):
+#     """Get report status"""
+#     return reports_status.get(report_id, "Not found")
 
 def generate_report(report_id: str):
     try:
@@ -163,11 +69,11 @@ def generate_report(report_id: str):
         df = pd.DataFrame(rows)
         os.makedirs('output', exist_ok=True)
         df.to_csv(f'output/{report_id}.csv', index=False)
-        update_status(report_id, "Complete")
+        # Status will be updated by main.py, not here
 
     except Exception as e:
         print(f"[ERROR] Report generation failed for {report_id}: {e}")
-        update_status(report_id, f"Failed: {e}")
+        # Status will be updated by main.py, not here
 
 def generate_single_store_report(report_id: str, store_id: str):
     """
@@ -179,7 +85,7 @@ def generate_single_store_report(report_id: str, store_id: str):
         # Check if store exists
         store_exists = db.query(StoreStatus).filter_by(store_id=store_id).first()
         if not store_exists:
-            update_status(report_id, f"Failed: Store ID '{store_id}' not found")
+            # Status will be updated by main.py, not here
             return
 
         # Get the latest timestamp to use as reference point
@@ -269,13 +175,13 @@ def generate_single_store_report(report_id: str, store_id: str):
         print(f"[SUCCESS] Single store report generated for {store_id}")
         print(f"[SUMMARY] Day: {metrics.get('uptime_last_day_hours', 0)}h up, Week: {metrics.get('uptime_last_week_hours', 0)}h up, Month: {metrics.get('uptime_last_month_hours', 0)}h up")
         
-        update_status(report_id, "Complete")
+        # Status will be updated by main.py, not here
 
     except Exception as e:
         print(f"[ERROR] Single store report generation failed for {report_id}, store {store_id}: {e}")
         import traceback
         traceback.print_exc()
-        update_status(report_id, f"Failed: {e}")
+        # Status will be updated by main.py, not here
     finally:
         if 'db' in locals():
             db.close()
