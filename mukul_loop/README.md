@@ -1,5 +1,7 @@
 # Store Monitoring System
 
+##Link for CSV Output - `https://drive.google.com/file/d/1lEherCLB8cf_wpiEeek-Cq1yOIDOI0Q-/view?usp=sharing`
+
 A FastAPI-based backend system for monitoring restaurant uptime/downtime during business hours.
 
 ## Features
